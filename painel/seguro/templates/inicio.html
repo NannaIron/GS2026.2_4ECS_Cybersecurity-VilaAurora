@@ -1,0 +1,17 @@
+{% extends "base.html" %}{% block titulo %}Início{% endblock %}
+{% block conteudo %}
+<h1>Situação agora</h1>
+<section aria-labelledby="t-alertas"><h2 id="t-alertas">Alertas de segurança (SIEM)</h2>
+{% if alertas %}<table><caption class="pular">Alertas recentes</caption>
+<tr><th scope="col">Quando</th><th scope="col">Regra</th><th scope="col">Gravidade</th><th scope="col">Resumo</th><th scope="col">Resposta</th></tr>
+{% for a in alertas %}<tr><td>{{ a.ts.strftime('%d/%m %H:%M:%S') }}</td><td>{{ a.regra }}</td><td>{{ a.severidade }}</td><td>{{ a.resumo }}</td><td>{{ a.resposta or '' }}</td></tr>{% endfor %}
+</table>{% else %}<p class="ok">Nenhum alerta de segurança.</p>{% endif %}</section>
+<section aria-labelledby="t-locais"><h2 id="t-locais">Alarmes gerados nas bordas (funcionam sem internet)</h2>
+{% if locais %}<ul>{% for l in locais %}<li>{{ l.ts.strftime('%d/%m %H:%M:%S') }} — {{ l.payload.get('mensagem') }}</li>{% endfor %}</ul>
+{% else %}<p class="ok">Nenhum alarme local.</p>{% endif %}</section>
+<section aria-labelledby="t-leituras"><h2 id="t-leituras">Últimas leituras dos sensores</h2>
+<table><tr><th scope="col">Sensor (tópico)</th><th scope="col">Quando</th><th scope="col">Valores</th></tr>
+{% for l in leituras %}<tr><td>{{ l.topico }}</td><td>{{ l.ts.strftime('%d/%m %H:%M:%S') }}</td>
+<td>{% for k, v in l.payload.items() if k not in ('ts','dispositivo') %}{{ k }}: <strong>{{ v }}</strong>{% if not loop.last %}, {% endif %}{% endfor %}</td></tr>{% endfor %}
+</table></section>
+{% endblock %}

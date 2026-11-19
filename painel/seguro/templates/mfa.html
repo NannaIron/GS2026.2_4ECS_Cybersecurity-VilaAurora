@@ -1,0 +1,12 @@
+{% extends "base.html" %}{% block titulo %}Código de verificação{% endblock %}
+{% block conteudo %}
+<h1>Código de verificação (MFA)</h1>
+<p>Abra o aplicativo autenticador no seu celular e digite o código de 6 números.</p>
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+<form method="post" action="{{ url_for('mfa') }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="codigo">Código de 6 números</label>
+  <input id="codigo" name="codigo" inputmode="numeric" pattern="[0-9]{6}" autocomplete="one-time-code" required maxlength="6">
+  <div><button type="submit">Entrar</button></div>
+</form>
+{% endblock %}

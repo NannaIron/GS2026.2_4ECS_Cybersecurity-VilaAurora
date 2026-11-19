@@ -1,0 +1,4 @@
+# Bibliotecas que não vêm do apk (puro Python)
+paho-mqtt==2.1.0
+pyotp==2.9.0
+sqlmap==1.9.2

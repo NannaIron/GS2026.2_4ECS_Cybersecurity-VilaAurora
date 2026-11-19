@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% block titulo %}Bomba d'água{% endblock %}
+{% block conteudo %}
+<h1>Agendamento da bomba d'água</h1>
+<p>Regra de segurança: a bomba só funciona entre <strong>06:00 e 22:00</strong>, no máximo <strong>4 horas seguidas</strong>.
+A borda da escola recusa qualquer agendamento fora dessa regra, mesmo que venha da nuvem.</p>
+{% if msg %}<p class="{{ 'ok' if msg.startswith('Agendamento salvo') else 'aviso' }}" role="status">{{ msg }}</p>{% endif %}
+<table><tr><th scope="col">Espaço</th><th scope="col">Início</th><th scope="col">Fim</th><th scope="col">Alterado por</th>{% if perfil=='coordenacao' %}<th scope="col">Alterar</th>{% endif %}</tr>
+{% for l in linhas %}<tr><td>{{ l.espaco }}</td><td>{{ l.ini }}</td><td>{{ l.fim }}</td><td>{{ l.atualizado_por }} em {{ l.atualizado_em.strftime('%d/%m %H:%M') }}</td>
+{% if perfil=='coordenacao' %}<td><form method="post" action="{{ url_for('agendamento') }}">
+<input type="hidden" name="csrf" value="{{ csrf }}"><input type="hidden" name="id" value="{{ l.id }}">
+<label for="ini{{ l.id }}">Início</label><input id="ini{{ l.id }}" name="inicio" type="time" value="{{ l.ini }}" required>
+<label for="fim{{ l.id }}">Fim</label><input id="fim{{ l.id }}" name="fim" type="time" value="{{ l.fim }}" required>
+<button type="submit">Salvar</button></form></td>{% endif %}</tr>{% endfor %}
+</table>
+{% endblock %}

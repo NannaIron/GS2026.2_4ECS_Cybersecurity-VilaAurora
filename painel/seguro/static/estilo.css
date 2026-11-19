@@ -1,0 +1,20 @@
+/* Painel acessível (WCAG 2.1 AA): contraste >= 4.5:1, foco visível, fonte grande */
+:root { --fundo:#ffffff; --texto:#1a1a1a; --primaria:#0b4f8a; --alerta:#a30000; --ok:#1d6b2f; --borda:#5a5a5a; }
+* { box-sizing: border-box; }
+body { font-family: system-ui, "Segoe UI", Arial, sans-serif; font-size: 1.125rem; line-height: 1.6;
+       color: var(--texto); background: var(--fundo); margin: 0; }
+a { color: var(--primaria); }
+a:focus, button:focus, input:focus, select:focus { outline: 3px solid #f0a500; outline-offset: 2px; }
+.pular { position: absolute; left: -999px; } .pular:focus { left: 1rem; top: 1rem; background: #fff; padding: .5rem; z-index: 9; }
+header { background: var(--primaria); color: #fff; padding: .75rem 1.25rem; }
+header a { color: #fff; } nav ul { list-style: none; display: flex; flex-wrap: wrap; gap: 1rem; padding: 0; margin: .5rem 0 0; }
+main { padding: 1.25rem; max-width: 1100px; margin: auto; }
+table { border-collapse: collapse; width: 100%; margin: 1rem 0; } th, td { border: 1px solid var(--borda); padding: .4rem .6rem; text-align: left; }
+th { background: #e8eef5; }
+label { display: block; font-weight: 600; margin-top: .75rem; }
+input, select, button { font-size: 1.1rem; padding: .45rem .6rem; border: 2px solid var(--borda); border-radius: 4px; }
+button { background: var(--primaria); color: #fff; border-color: var(--primaria); cursor: pointer; margin-top: .75rem; }
+button.perigo { background: var(--alerta); border-color: var(--alerta); }
+.aviso { border-left: 6px solid var(--alerta); background: #fdecec; padding: .75rem; }
+.ok { border-left: 6px solid var(--ok); background: #e9f5ec; padding: .75rem; }
+.alto { color: var(--alerta); font-weight: 700; }

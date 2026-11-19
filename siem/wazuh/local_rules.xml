@@ -1,0 +1,52 @@
+<!--
+  Vila Aurora — regras locais de exemplo (espelho de R1–R5 do siem/siem.py).
+  NÃO exercitado de ponta a ponta neste E2. IDs na faixa 100100–100199 (custom).
+-->
+<group name="vila_aurora,">
+
+  <!-- R1: login VPN anômalo (IP fora da allowlist ou horário) -->
+  <rule id="100101" level="10">
+    <decoded_as>json</decoded_as>
+    <field name="evento">vpn_login</field>
+    <description>VA R1: login VPN (correlacionar IP/horário no manager)</description>
+    <mitre>
+      <id>T1078</id>
+      <id>T1133</id>
+    </mitre>
+  </rule>
+
+  <!-- R2: padrão SQLi -->
+  <rule id="100102" level="12">
+    <decoded_as>json</decoded_as>
+    <field name="evento">legado_consulta|painel_busca|erro_sql</field>
+    <regex>union\s+select|' or |sleep\(|pg_sleep|information_schema</regex>
+    <description>VA R2: possível SQLi</description>
+    <mitre>
+      <id>T1190</id>
+    </mitre>
+  </rule>
+
+  <!-- R3: certificado MQTT inválido / ausente / revogado -->
+  <rule id="100103" level="10">
+    <match>certificate verify failed|peer did not return a certificate|certificate revoked</match>
+    <description>VA R3: falha de certificado no broker MQTT</description>
+  </rule>
+
+  <!-- R4: atuador / agenda fora do perfil -->
+  <rule id="100104" level="12">
+    <decoded_as>json</decoded_as>
+    <field name="evento">agendamento_fora_perfil|comando_atuador|atuador_fora_do_perfil</field>
+    <description>VA R4: comando ou agenda fora do perfil seguro</description>
+    <mitre>
+      <id>T0831</id>
+    </mitre>
+  </rule>
+
+  <!-- R5: dispositivo suspeito -->
+  <rule id="100105" level="12">
+    <decoded_as>json</decoded_as>
+    <field name="evento">dispositivo_suspeito|sensor_comprometido</field>
+    <description>VA R5: dispositivo suspeito — isolar</description>
+  </rule>
+
+</group>

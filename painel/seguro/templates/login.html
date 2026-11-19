@@ -1,0 +1,14 @@
+{% extends "base.html" %}{% block titulo %}Entrar{% endblock %}
+{% block conteudo %}
+<h1>Entrar no painel</h1>
+<p>Use seu usuário e senha. Depois vamos pedir o código do aplicativo autenticador.</p>
+<p class="aviso"><strong>Atenção:</strong> a equipe nunca pede sua senha por e-mail, WhatsApp ou áudio.
+Pedido urgente? Ligue para o número oficial e confirme a <em>palavra-código</em> da semana.</p>
+{% if erro %}<p class="aviso" role="alert">{{ erro }}</p>{% endif %}
+<form method="post" action="{{ url_for('login') }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="usuario">Usuário</label><input id="usuario" name="usuario" autocomplete="username" required maxlength="40">
+  <label for="senha">Senha</label><input id="senha" name="senha" type="password" autocomplete="current-password" required>
+  <div><button type="submit">Continuar</button></div>
+</form>
+{% endblock %}

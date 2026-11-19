@@ -1,0 +1,14 @@
+# Segredos e material gerado no setup - NUNCA versionar (RT, regra C9)
+.env
+segredos/*
+pki/*
+!segredos/.gitkeep
+!pki/.gitkeep
+# Saídas de execução (geradas na máquina de quem roda)
+resultados/*
+!resultados/.gitkeep
+evidencias/*
+!evidencias/.gitkeep
+*.tar.gz
+__pycache__/
+*.pyc

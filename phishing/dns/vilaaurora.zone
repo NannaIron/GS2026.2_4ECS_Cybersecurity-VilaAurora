@@ -1,0 +1,15 @@
+; Registros DNS do domínio FICTÍCIO vilaaurora.example (RFC 2606) - RT-10
+; Exemplo documentado; em produção, publicar na zona real e validar com dig/MXToolbox.
+
+; --- SPF: só o servidor de e-mail oficial envia; todo o resto falha (-all) ---
+vilaaurora.example.            IN TXT "v=spf1 mx a:mail.vilaaurora.example -all"
+
+; --- DKIM: chave pública do seletor s1 (a privada NUNCA vai para o Git/DNS) ---
+s1._domainkey.vilaaurora.example. IN TXT "v=DKIM1; k=rsa; t=s; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A...CHAVE_PUBLICA_EXEMPLO...IDAQAB"
+
+; --- DMARC: política mínima quarantine, 100%, com relatórios e alinhamento estrito ---
+_dmarc.vilaaurora.example.     IN TXT "v=DMARC1; p=quarantine; sp=quarantine; pct=100; adkim=s; aspf=s; rua=mailto:dmarc@vilaaurora.example; ruf=mailto:dmarc@vilaaurora.example; fo=1"
+
+; (Opcional, reforço) MTA-STS e TLS-RPT
+_mta-sts.vilaaurora.example.   IN TXT "v=STSv1; id=20261119T000000Z"
+_smtp._tls.vilaaurora.example. IN TXT "v=TLSRPTv1; rua=mailto:tlsrpt@vilaaurora.example"

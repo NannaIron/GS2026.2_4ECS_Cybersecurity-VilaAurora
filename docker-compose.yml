@@ -1,0 +1,283 @@
+# Rede Comunitária Vila Aurora - protótipo E2 (GS 2026.2 Cybersecurity)
+# Camadas: CAMPO (sensores) -> BORDA (mosquitto mTLS + regras + buffer) -> VPN WireGuard
+#          -> NUVEM (API, PostgreSQL, SIEM/SOAR) -> SUPERVISÃO (painel seguro via VPN + MFA)
+# Segmentos (redes Docker): seg_iot | seg_wan ("internet") | seg_admin | seg_legado
+# e, dentro do túnel WireGuard: 10.10.1.0/24 (bordas) e 10.10.2.0/24 (operadores).
+name: vila-aurora
+
+x-py: &py
+  image: vila-aurora/py:1.0
+  build:
+    context: .
+    dockerfile: docker/py/Dockerfile
+  restart: unless-stopped
+  init: true
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }
+
+services:
+  # ======================= NUVEM =======================
+  postgres:
+    image: postgres:16-alpine
+    container_name: va-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: aurora_owner
+      POSTGRES_DB: aurora
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?rode make setup}
+      PAINEL_APP_PASSWORD: ${PAINEL_APP_PASSWORD}
+      INGEST_APP_PASSWORD: ${INGEST_APP_PASSWORD}
+      SIEM_APP_PASSWORD: ${SIEM_APP_PASSWORD}
+      TZ: America/Sao_Paulo
+    command: >
+      sh -c "mkdir -p /pglogs && chown postgres /pglogs && chmod 755 /pglogs &&
+      exec docker-entrypoint.sh postgres -c logging_collector=on -c log_directory=/pglogs
+      -c log_filename=postgresql.log -c log_file_mode=0644 -c log_statement=ddl
+      -c log_connections=on -c log_disconnections=on -c log_timezone=UTC
+      -c 'log_line_prefix=%m [%p] %u@%d %h '"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - pglogs:/pglogs
+      - ./nuvem/db/init/01-schema.sh:/docker-entrypoint-initdb.d/01-schema.sh:ro
+      - ./segredos/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+    networks:
+      seg_admin: { ipv4_address: 172.31.20.5 }
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aurora_owner -d aurora"]
+      interval: 5s
+      retries: 20
+
+  nuvem-gw:
+    <<: *py
+    container_name: va-nuvem-gw
+    entrypoint: ["/app/nuvem/gw/entrypoint.sh"]
+    cap_add: [NET_ADMIN]
+    sysctls:
+      net.ipv4.ip_forward: "0"
+    ports:
+      - "${WG_BIND:-127.0.0.1}:51820:51820/udp"   # ÚNICA porta exposta da solução segura (WireGuard)
+    volumes:
+      - ./segredos/wg/nuvem.conf:/segredos/wg/nuvem.conf:ro
+    networks:
+      seg_wan: { ipv4_address: 172.31.0.10 }
+      seg_admin: { ipv4_address: 172.31.20.10 }
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/pronto"]
+      interval: 3s
+      retries: 20
+
+  nuvem-api:
+    <<: *py
+    container_name: va-nuvem-api
+    network_mode: "service:nuvem-gw"
+    depends_on:
+      nuvem-gw: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    environment:
+      SERVICO: nuvem-api
+      INGEST_APP_PASSWORD: ${INGEST_APP_PASSWORD}
+    command: ["gunicorn", "-w", "2", "-b", "10.10.0.1:9000", "--chdir", "/app/nuvem/api", "app:app"]
+    volumes:
+      - logs:/logs
+
+  painel-seguro:
+    <<: *py
+    container_name: va-painel-seguro
+    network_mode: "service:nuvem-gw"
+    depends_on:
+      nuvem-gw: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    environment:
+      SERVICO: painel-seguro
+      PAINEL_APP_PASSWORD: ${PAINEL_APP_PASSWORD}
+      FLASK_SECRET: ${FLASK_SECRET}
+      WAF_ATIVO: ${WAF_ATIVO:-1}
+    command: ["gunicorn", "-w", "1", "--threads", "8", "-b", "10.10.0.1:8443",
+              "--certfile", "/pki/painel/painel.crt", "--keyfile", "/pki/painel/painel.key",
+              "--chdir", "/app/painel/seguro", "app:app"]
+    volumes:
+      - ./pki/painel:/pki/painel:ro
+      - logs:/logs
+
+  siem:
+    <<: *py
+    container_name: va-siem
+    network_mode: "service:nuvem-gw"
+    cap_add: [NET_ADMIN]       # SOAR: bloquear IP (iptables) e encerrar sessão (wg)
+    depends_on:
+      nuvem-gw: { condition: service_healthy }
+      postgres: { condition: service_healthy }
+    environment:
+      SERVICO: siem
+      SIEM_APP_PASSWORD: ${SIEM_APP_PASSWORD}
+      PKI_DIR: /pki
+      HOST_UID: ${HOST_UID:-1000}
+      HOST_GID: ${HOST_GID:-1000}
+      VPN_IPS_CONHECIDOS: ${VPN_IPS_CONHECIDOS:-172.31.0.20,172.31.0.2,172.31.0.1}
+    command: ["python3", "/app/siem/siem.py"]
+    volumes:
+      - logs:/logs
+      - mosq-log:/mosquitto-log:ro
+      - pglogs:/pglogs:ro
+      - ./pki:/pki
+      - ./segredos/wg/peers.json:/segredos/wg/peers.json:ro
+      - soar:/soar
+
+  # ======================= BORDA =======================
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: va-mosquitto
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "/entrypoint-borda.sh"]
+    environment:
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./borda/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./borda/mosquitto/entrypoint.sh:/entrypoint-borda.sh:ro
+      - ./pki/broker:/pki:ro
+      - mosq-log:/mosquitto/log
+      - mosq-data:/mosquitto/data
+    networks:
+      seg_iot: { ipv4_address: 172.31.10.5 }
+
+  borda:
+    <<: *py
+    container_name: va-borda
+    entrypoint: ["/app/borda/entrypoint.sh"]
+    cap_add: [NET_ADMIN]
+    depends_on: [mosquitto]
+    environment:
+      SERVICO: borda
+      BORDA_ID: borda-vila
+      PSEUDO_KEY: ${PSEUDO_KEY}
+      SYNC_INTERVALO: "5"
+    volumes:
+      - ./segredos/wg/borda-vila.conf:/segredos/wg/borda-vila.conf:ro
+      - ./pki/dispositivos/borda-regras:/pki/dispositivos/borda-regras:ro
+      - borda-data:/data
+      - logs:/logs
+    networks:
+      seg_iot: { ipv4_address: 172.31.10.2 }
+      seg_wan: { ipv4_address: 172.31.0.2 }
+
+  # ======================= CAMPO =======================
+  sensores:
+    <<: *py
+    container_name: va-sensores
+    depends_on: [mosquitto]
+    environment:
+      SERVICO: sensores
+      SENSOR_INTERVALO: "2"
+    command: ["python3", "/app/campo/sensores.py"]
+    volumes:
+      - ./pki/dispositivos:/pki/dispositivos:ro
+      - logs:/logs
+    networks:
+      seg_iot: { ipv4_address: 172.31.10.10 }
+
+  # ======================= SUPERVISÃO / LAB =======================
+  operador:     # notebook de um(a) operador(a) remoto(a): cliente WireGuard + testes
+    <<: *py
+    container_name: va-operador
+    cap_add: [NET_ADMIN]
+    entrypoint: ["sh", "-c", "/app/common/wg_up.sh /segredos/wg/operador-lab.conf 10.10.2.11/32 10.10.0.1/32 && exec sleep infinity"]
+    environment:
+      SERVICO: operador
+    volumes:
+      - ./segredos/wg/operador-lab.conf:/segredos/wg/operador-lab.conf:ro
+      - ./segredos/usuarios.json:/segredos/usuarios.json:ro   # só no laboratório (gerar TOTP nos testes)
+      - ./pki/painel/ca.crt:/pki/ca.crt:ro
+      - ./resultados:/resultados
+    networks:
+      seg_wan: { ipv4_address: 172.31.0.20 }
+
+  atacante:     # máquina do atacante na "internet" (sem chaves, sem certificados)
+    <<: *py
+    container_name: va-atacante
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - ./ataque:/ataque:ro
+      - ./resultados:/resultados
+    networks:
+      seg_wan: { ipv4_address: 172.31.0.66 }
+
+  # ======================= LEGADO (só para reproduzir o incidente) =======================
+  vpn-legada:
+    <<: *py
+    container_name: va-vpn-legada
+    profiles: [legado]
+    environment:
+      SERVICO: vpn-legada
+    command: ["gunicorn", "-w", "1", "--threads", "4", "-b", "0.0.0.0:8080", "--chdir", "/app/painel/vpn_legada", "app:app"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ./segredos/usuarios.json:/segredos/usuarios.json:ro
+      - soar:/soar:ro
+      - logs:/logs
+    networks:
+      seg_wan: { ipv4_address: 172.31.0.30 }
+      seg_legado: {}
+
+  painel-legado:
+    <<: *py
+    container_name: va-painel-legado
+    profiles: [legado]
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      SERVICO: painel-legado
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    command: ["gunicorn", "-w", "1", "--threads", "4", "-b", "0.0.0.0:5000", "--chdir", "/app/painel/legado", "app:app"]
+    volumes:
+      - logs:/logs
+    networks:
+      seg_legado: {}
+      seg_admin: {}
+
+  # ======================= PHISHING SIMULADO (perfil opcional) =======================
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: va-mailpit
+    profiles: [phishing]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8025:8025"
+    networks:
+      seg_phishing: {}
+      seg_wan: { ipv4_address: 172.31.0.25 }
+
+  gophish:
+    image: gophish/gophish:latest
+    container_name: va-gophish
+    profiles: [phishing]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3333:3333"   # admin (HTTPS, certificado autoassinado)
+      - "127.0.0.1:8088:80"     # página falsa da campanha (só contas fictícias!)
+    networks: [seg_phishing]
+
+networks:
+  seg_wan:
+    ipam: { config: [{ subnet: 172.31.0.0/24 }] }
+  seg_iot:
+    internal: true
+    ipam: { config: [{ subnet: 172.31.10.0/24 }] }
+  seg_admin:
+    internal: true
+    ipam: { config: [{ subnet: 172.31.20.0/24 }] }
+  seg_legado:
+    internal: true
+    ipam: { config: [{ subnet: 172.31.30.0/24 }] }
+  seg_phishing:
+    ipam: { config: [{ subnet: 172.31.40.0/24 }] }
+
+volumes:
+  pgdata: {}
+  pglogs: {}
+  logs: {}
+  mosq-log: {}
+  mosq-data: {}
+  borda-data: {}
+  soar: {}

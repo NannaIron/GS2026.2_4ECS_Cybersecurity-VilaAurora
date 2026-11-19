@@ -1,0 +1,25 @@
+{% extends "base.html" %}{% block titulo %}Comandos e aprovações{% endblock %}
+{% block conteudo %}
+<h1>Comandos para as bordas</h1>
+{% if msg %}<p class="ok" role="status">{{ msg }}</p>{% endif %}
+{% if perfil in ('tecnico','coordenacao') %}
+<form method="post" action="{{ url_for('comandos') }}">
+  <input type="hidden" name="csrf" value="{{ csrf }}">
+  <label for="acao">O que fazer</label>
+  <select id="acao" name="acao">{% for k, v in ACOES.items() %}<option value="{{ k }}">{{ v[1] }}{% if v[0]=='alto' %} (precisa de aprovação){% endif %}</option>{% endfor %}</select>
+  <label for="motivo">Motivo</label><input id="motivo" name="motivo" maxlength="200">
+  <div><button type="submit">Enviar pedido</button></div>
+</form>
+{% endif %}
+<h2>Pedidos</h2>
+<table><tr><th scope="col">#</th><th scope="col">Quando</th><th scope="col">Ação</th><th scope="col">Risco</th><th scope="col">Situação</th><th scope="col">Pedido por</th><th scope="col">Aprovado por</th><th scope="col">Decisão</th></tr>
+{% for c in linhas %}<tr><td>{{ c.id }}</td><td>{{ c.criado_em.strftime('%d/%m %H:%M:%S') }}</td><td>{{ c.acao }}</td>
+<td class="{{ 'alto' if c.risco=='alto' else '' }}">{{ c.risco }}</td><td>{{ c.status }}</td><td>{{ c.solicitado_por }}</td><td>{{ c.aprovado_por or '' }}</td>
+<td>{% if c.status=='pendente' and perfil=='coordenacao' %}
+<form method="post" action="{{ url_for('decidir', cid=c.id) }}">
+<input type="hidden" name="csrf" value="{{ csrf }}">
+<label for="cod{{ c.id }}">Código MFA novo</label><input id="cod{{ c.id }}" name="codigo" inputmode="numeric" maxlength="6" required>
+<button type="submit" name="decisao" value="aprovar" class="perigo">Aprovar</button>
+<button type="submit" name="decisao" value="rejeitar">Rejeitar</button></form>{% endif %}</td></tr>{% endfor %}
+</table>
+{% endblock %}
