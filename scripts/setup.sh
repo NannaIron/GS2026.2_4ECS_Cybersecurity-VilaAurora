@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 echo "== Verificando pré-requisitos"
-command -v docker >/dev/null || { echo "Instale o Docker (Arch: sudo pacman -S docker docker-compose docker-buildx)"; exit 1; }
+command -v docker >/dev/null || { echo "Instale o Docker Engine com os plugins compose e buildx (https://docs.docker.com/engine/install/)"; exit 1; }
 docker compose version >/dev/null || { echo "Falta o plugin docker compose"; exit 1; }
 if ! (lsmod 2>/dev/null | grep -q '^wireguard' || [ -d /sys/module/wireguard ]); then
   echo "Carregando módulo wireguard do kernel (precisa de sudo)..."

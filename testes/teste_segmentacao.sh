@@ -34,11 +34,11 @@ teste "borda -> PostgreSQL 172.31.20.5:5432" va-borda "nc -z -w 2 172.31.20.5 54
 
 r ""; r "## Dispositivos IoT (segmento seg_iot, sem saída)"
 teste "sensores -> internet (1.1.1.1:443)" va-sensores "nc -z -w 2 1.1.1.1 443" bloqueado
-teste "sensores -> nuvem 172.31.0.10:51820" va-sensores "nc -z -u -w 2 172.31.20.10 5432" bloqueado
+teste "sensores -> nuvem 172.31.0.10:51820" va-sensores "nc -z -u -w 2 172.31.0.10 51820" bloqueado
 teste "sensores -> PostgreSQL 172.31.20.5:5432" va-sensores "nc -z -w 2 172.31.20.5 5432" bloqueado
 
 r ""; r "## Portas publicadas no host (só WireGuard UDP; legado/phishing apenas em 127.0.0.1 quando ligados)"
-r "$(docker ps --format '{{.Names}}\t{{.Ports}}' | grep -v -E '\t$' )"
+r "$(docker ps --format '{{.Names}}\t{{.Ports}}' | grep -v -P '\t$' )"
 
 r ""; r "## WireGuard (cifras fixas e modernas: Curve25519, ChaCha20-Poly1305, BLAKE2s + PSK)"
 r "$(docker exec va-nuvem-gw wg show wg0 | sed -E 's/(public key: ).*/\1(omitida)/')"

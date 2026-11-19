@@ -225,6 +225,8 @@ def isolar(cn):
 
 def reabilitar(cn):
     """Depois da investigação: volta o CN para a ACL com um certificado NOVO (o antigo segue revogado)."""
+    if cn not in isolados():
+        raise SystemExit(f"[pki] {cn} não está isolado. Isolados agora: {', '.join(sorted(isolados())) or 'nenhum'}")
     p = os.path.join(BASE, "isolados.txt")
     restantes = [x for x in isolados() if x != cn]
     open(p, "w").write("\n".join(restantes) + ("\n" if restantes else ""))

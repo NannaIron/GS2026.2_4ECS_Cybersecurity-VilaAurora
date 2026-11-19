@@ -56,7 +56,7 @@ revogar:        ## revoga o certificado de um dispositivo: make revogar CN=horta
 rotacionar:     ## rotaciona o certificado de um dispositivo: make rotacionar CN=escola-nivel-01
 	$(PKI) rotacionar $(CN)
 
-reabilitar:     ## após investigar, devolve o dispositivo com certificado novo: make reabilitar CN=horta-umidade-01
+reabilitar:     ## após investigar, devolve o dispositivo isolado com certificado novo: make reabilitar CN=horta-umidade-01
 	docker exec va-sensores rm -f /tmp/sim/sensor_comprometido
 	$(PKI) reabilitar $(CN)
 
