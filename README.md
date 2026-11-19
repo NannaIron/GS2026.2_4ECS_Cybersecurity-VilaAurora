@@ -3,7 +3,6 @@
 **FIAP Global Solution 2026.2 — Cybersecurity**  
 **Professor:** Carlos Eduardo de Siqueira  
 **Turma:** 4ECS  
-**Entrega:** 19/11/2026 23h59
 
 ## Equipe
 
